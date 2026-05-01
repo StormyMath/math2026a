@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>学習ログ集計ツール（時間フィルター版）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, query, orderBy, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- Firebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAOJnHuUqjc8caecnNu_pkul2ORvzWmox0",
+            authDomain: "start01-20260120a-76f80.firebaseapp.com",
+            projectId: "start01-20260120a-76f80",
+            storageBucket: "start01-20260120a-76f80.firebasestorage.app",
+            messagingSenderId: "213284691100",
+            appId: "1:213284691100:web:046aa5f86e4cb1a2562159"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function fetchAndSummarize(colName) {
+            const status = document.getElementById("status");
+            const filterValue = document.getElementById("start-datetime").value;
+            status.textContent = "データ取得中...";
+            
+            try {
+                let q;
+                const colRef = collection(db, colName);
+
+                if (filterValue) {
+                    // 入力された日時をFirebaseのTimestampに変換
+                    const startDate = new Date(filterValue);
+                    const startTimestamp = Timestamp.fromDate(startDate);
+                    
+                    // 指定日時以降、かつ時間順に並べるクエリ
+                    q = query(
+                        colRef, 
+                        where("timestamp", ">=", startTimestamp),
+                        orderBy("timestamp", "desc")
+                    );
+                } else {
+                    // 指定がない場合は全件取得
+                    q = query(colRef, orderBy("timestamp", "desc"));
+                }
+
+                const querySnapshot = await getDocs(q);
+                const rawLogs = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const d = doc.data();
+                    rawLogs.push({
+                        time: d.timestamp?.toDate().toLocaleString() || "N/A",
+                        student_id: d.student_id,
+                        student_name: d.student_name,
+                        problem: d.problem,
+                        miss: d.miss_count || 0,
+                        duration: d.duration || 0
+                    });
+                });
+
+                const summaryMap = {};
+                rawLogs.forEach(log => {
+                    if (!summaryMap[log.student_id]) {
+                        summaryMap[log.student_id] = {
+                            name: log.student_name,
+                            correctCount: 0,
+                            totalMiss: 0,
+                            totalDuration: 0,
+                            firstTime: log.time,
+                            lastTime: log.time
+                        };
+                    }
+                    const s = summaryMap[log.student_id];
+                    s.correctCount++;
+                    s.totalMiss += log.miss;
+                    s.totalDuration += log.duration;
+                    s.lastTime = log.time; 
+                });
+
+                renderTable(summaryMap, colName);
+                status.textContent = `完了: ${rawLogs.length}件のログを読み込みました。`;
+            } catch (e) {
+                console.error(e);
+                status.textContent = "エラーが発生しました。インデックスの設定が必要な場合があります。";
+                
+                if (e.message.includes("index")) {
+                    status.innerHTML = `集計にはFirebase側で「複合インデックス」の作成が必要です。<br>
+                    コンソールのエラーログに表示されるURLをクリックして作成してください。`;
+                }
+            }
+        }
+
+        function renderTable(summaryMap, colName) {
+            const container = document.getElementById("table-container");
+            let html = `<div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">${colName} の集計結果</h2>
+                        </div>
+                        <table class="w-full text-left border-collapse border border-slate-300 mb-8">
+                        <thead><tr class="bg-slate-100">
+                            <th class="border p-2">生徒番号</th><th class="border p-2">名前</th>
+                            <th class="border p-2">正解数</th><th class="border p-2">ミス合計</th>
+                            <th class="border p-2">総時間(秒)</th><th class="border p-2">最新日時</th>
+                        </tr></thead><tbody>`;
+
+            const rows = [];
+            for (const id in summaryMap) {
+                const s = summaryMap[id];
+                html += `<tr>
+                    <td class="border p-2">${id}</td><td class="border p-2">${s.name}</td>
+                    <td class="border p-2">${s.correctCount}</td><td class="border p-2">${s.totalMiss}</td>
+                    <td class="border p-2">${s.totalDuration.toFixed(1)}</td><td class="border p-2">${s.firstTime}</td>
+                </tr>`;
+                rows.push([id, s.name, s.correctCount, s.totalMiss, s.totalDuration.toFixed(1), s.firstTime]);
+            }
+            html += `</tbody></table>`;
+            
+            const csvBtn = document.createElement("button");
+            csvBtn.textContent = "この表をCSVで保存";
+            csvBtn.className = "bg-green-600 text-white px-4 py-2 rounded mb-6 hover:bg-green-700 transition";
+            csvBtn.onclick = () => downloadCSV(rows, colName);
+            
+            container.innerHTML = html;
+            container.prepend(csvBtn);
+        }
+
+        function downloadCSV(rows, colName) {
+            const headers = ["生徒番号", "名前", "正解数", "ミス合計", "総時間(秒)", "最新日時"];
+            const content = [headers, ...rows].map(r => r.join(",")).join("\n");
+            const blob = new Blob(["\ufeff" + content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `${colName}_summary_${new Date().toLocaleDateString()}.csv`;
+            link.click();
+        }
+
+        window.fetchData = fetchAndSummarize;
+    </script>
+</head>
+<body class="p-8 bg-slate-50 min-h-screen">
+    <h1 class="text-3xl font-bold mb-6 text-slate-800">📊 学習ログ集計パネル</h1>
+    
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
+        <h3 class="text-lg font-semibold mb-4 text-slate-700">取得条件の設定</h3>
+        <div class="flex flex-wrap items-end gap-6">
+            <div>
+                <label class="block text-sm font-medium text-slate-500 mb-1">この日時以降のデータを取得：</label>
+                <input type="datetime-local" id="start-datetime" 
+                       class="border border-slate-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="fetchData('logs_1nen')" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-blue-700 active:scale-95 transition">2025-1年生のデータを取得</button>
+                <button onclick="fetchData('logs_2nen')" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition">2025-2年生のデータを取得</button>
+                <button onclick="fetchData('test_logs_2026_3nen')" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition">3年生のデータを取得</button>
+            </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-3">※未指定の場合はすべての履歴を取得します。</p>
+    </div>
+
+    <div id="status" class="text-slate-600 mb-4 font-mono font-medium"></div>
+    <div id="table-container" class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 overflow-auto"></div>
+</body>
+</html>
