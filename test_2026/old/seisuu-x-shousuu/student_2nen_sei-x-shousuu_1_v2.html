@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>4ねん_2026・せいすう×しょうすうトレーニング</title>
+    <title>2ねん・せいすう×しょうすうトレーニング</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -31,13 +31,13 @@
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        window.firebaseDB = { db, collection, addDoc, serverTimestamp, collectionName: "test_logs_2026_3nen" };
+        window.firebaseDB = { db, collection, addDoc, serverTimestamp, collectionName: "logs_2nen" };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
         const UI_TEXT = {
-            LOGIN_TITLE: "なまえを えらんでね（1ねん）",
+            LOGIN_TITLE: "なまえを えらんでね（2ねん）",
             LABEL_STUDENT: "さん",
             LABEL_PROBLEM: "もんだい",
             BTN_DELETE: "けす",
@@ -50,10 +50,12 @@
             LOADING: "よみこみちゅう..."
         };
 
-        const APP_ID = "test_2026-4nen"; // 順番通り（Sequential）版のID
+        const APP_ID = "sei_shousuu_2_seq";
 
         const classRoster = [
-            { id: "1", name: "生徒4102" }, { id: "2", name: "生徒4103" }, { id: "3", name: "生徒4205" }
+            { id: "2101", name: "2101" }, { id: "2102", name: "2102" }, { id: "2103", name: "2103" },
+            { id: "2111", name: "2111" }, { id: "2202", name: "2202" }, { id: "2203", name: "2203" },
+            { id: "2204", name: "2204" }, { id: "2209", name: "2209" }
         ];
 
         function App() {
@@ -142,7 +144,6 @@
             return (
                 <div className="flex full-height">
                     <div className="w-1/2 flex flex-col items-center justify-center border-r-2 border-slate-200 bg-white p-10 relative">
-                        {/* 左上の進捗表示エリアを追加 */}
                         <div className="absolute top-6 left-6 text-left space-y-4">
                             <div>
                                 <div className="text-indigo-600 text-sm font-black uppercase tracking-wider">{UI_TEXT.COUNT_LABEL}</div>

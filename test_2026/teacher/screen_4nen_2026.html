@@ -87,7 +87,7 @@
         window.toggleView = () => { isStudentView = !isStudentView; document.getElementById("view-label").textContent = isStudentView ? "生徒視点" : "教員視点"; renderBoard(); };
 
         function startListening() {
-            const q = query(collection(db, "test_logs_2026_3nen"), where("timestamp", ">", startTime), orderBy("timestamp", "asc"));
+            const q = query(collection(db, "test_logs_2026_4nen"), where("timestamp", ">", startTime), orderBy("timestamp", "asc"));
             onSnapshot(q, (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
@@ -149,7 +149,7 @@
 </head>
 <body>
     <div class="header">
-        <div style="font-size: 1.1rem;">🚀 3ねん-2026合計 <span id="total-display">0</span> 問</div>
+        <div style="font-size: 1.1rem;">🚀 4ねん-2026合計 <span id="total-display">0</span> 問</div>
         <div class="btn-group">
             <span id="view-label" style="color: #aaa; font-size: 0.8rem;">生徒視点</span>
             <button class="view-btn" onclick="toggleView()">視点切替</button>
