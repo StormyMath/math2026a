@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3x3筆算：入力順序最適化版</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .full-height { height: 100vh; }
+        .hissan-font { font-family: 'Courier New', Courier, monospace; font-weight: bold; }
+        .digit-box { 
+            width: 4rem; height: 5.2rem; 
+            border: 1px solid #d1d5db;
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 3.2rem; background: white;
+        }
+        .thick-border-top { border-top: 5px solid black !important; }
+        .active-slot { background-color: #fef08a; outline: 4px solid #eab308; z-index: 10; }
+        .key-btn { font-size: 2.5rem; font-weight: bold; height: 90px; }
+    </style>
+</head>
+<body class="bg-slate-50 overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [problems, setProblems] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [currentRowIdx, setCurrentRowIdx] = useState(0); 
+            const [step, setStep] = useState(0); 
+            const [inputRows, setInputRows] = useState([]);
+            const [feedback, setFeedback] = useState(null);
+
+            useEffect(() => {
+                fetch('problems_kakezan_3x3.csv')
+                    .then(res => res.text())
+                    .then(text => {
+                        const data = text.split('\n').slice(1).filter(l => l).map(l => {
+                            const v = l.split(',');
+                            return { id: v[0], n1: v[1], n2: v[2], p1: v[3].trim(), p2: v[4].trim(), p3: v[5].trim(), ans: v[6].trim() };
+                        });
+                        setProblems(data);
+                        if (data[0]) initProblem(data[0]);
+                    });
+            }, []);
+
+            const initProblem = (prob) => {
+                setInputRows([
+                    Array(prob.p1.length).fill(""),
+                    Array(prob.p2.length).fill(""),
+                    Array(prob.p3.length).fill(""),
+                    Array(prob.ans.length).fill("")
+                ]);
+                setCurrentRowIdx(0);
+                setStep(0);
+                setFeedback(null);
+            };
+
+            // --- 修正：先生のご要望に忠実な入力順序ロジック ---
+            const getOrder = (len, rowIdx) => {
+                if (!problems[currentIndex]) return [];
+                const current = problems[currentIndex];
+
+                // A. 途中計算 (p1, p2, p3)
+                if (rowIdx < 3) {
+                    if (len === 4) return [3, 2, 0, 1]; // 1s -> 10s -> 1000s -> 100s (ハイブリッド)
+                    if (len === 3) return [2, 1, 0];    // 1s -> 10s -> 100s (通常)
+                } 
+                
+                // B. 一番下の段 (合計)
+                if (rowIdx === 3) {
+                    const p3Len = current.p3.length;
+                    // 特殊条件：p3が3桁かつ合計が6桁のときのみ、最高位を逆転させる
+                    if (p3Len === 3 && len === 6) {
+                        return [5, 4, 3, 2, 0, 1]; // 1s->10s->100s->1000s -> 100k -> 10k (ハイブリッド)
+                    }
+                    // それ以外（5桁のときや、通常の6桁）は、すべて右から順
+                    if (len === 6) return [5, 4, 3, 2, 1, 0];
+                    if (len === 5) return [4, 3, 2, 1, 0]; 
+                }
+                
+                // デフォルト（念のための右から順）
+                let defaultOrder = [];
+                for (let i = len - 1; i >= 0; i--) defaultOrder.push(i);
+                return defaultOrder;
+            };
+
+            const handleKeyInput = (num) => {
+                if (feedback || !inputRows[currentRowIdx]) return;
+                const order = getOrder(inputRows[currentRowIdx].length, currentRowIdx);
+                if (step < order.length) {
+                    const newRows = [...inputRows];
+                    newRows[currentRowIdx][order[step]] = num;
+                    setInputRows(newRows);
+                    setStep(step + 1);
+                }
+            };
+
+            const handleDelete = () => {
+                if (feedback || step === 0) return;
+                const newRows = [...inputRows];
+                const order = getOrder(inputRows[currentRowIdx].length, currentRowIdx);
+                newRows[currentRowIdx][order[step - 1]] = "";
+                setInputRows(newRows);
+                setStep(step - 1);
+            };
+
+            const confirmRow = () => {
+                const currentProblem = problems[currentIndex];
+                const rowData = inputRows[currentRowIdx].join("");
+                let correctVal = [currentProblem.p1, currentProblem.p2, currentProblem.p3, currentProblem.ans][currentRowIdx];
+
+                if (rowData === correctVal) {
+                    if (currentRowIdx < 3) {
+                        setCurrentRowIdx(currentRowIdx + 1);
+                        setStep(0);
+                    } else {
+                        setFeedback("⭕ That's right！");
+                    }
+                } else {
+                    alert("wrong！");
+                }
+            };
+
+            if (problems.length === 0 || inputRows.length === 0) return <div class="p-10 text-2xl">読み込み中...</div>;
+            const current = problems[currentIndex];
+
+            // 座標計算
+            const n1Start = 4;
+            const n2Start = 3;
+            const p1Start = 7 - current.p1.length;
+            const p2Start = 6 - current.p2.length;
+            const p3Start = 5 - current.p3.length;
+            const ansStart = 7 - current.ans.length;
+
+            return (
+                <div class="flex full-height">
+                    <div class="w-3/5 bg-white border-r-2 p-4 flex flex-col items-center justify-center">
+                        <div class="mb-6 text-slate-400 font-bold text-2xl italic">No. {current.id}</div>
+                        <div class="grid grid-cols-6 hissan-font">
+                            {/* 問題 */}
+                            {current.n1.split('').map((d, i) => (
+                                <div key={`n1-${i}`} class="digit-box border-none" style={{ gridColumnStart: i === 0 ? n1Start : 'auto' }}>{d}</div>
+                            ))}
+                            <div class="digit-box border-none text-black" style={{ gridColumnStart: n2Start }}>×</div>
+                            {current.n2.split('').map((d, i) => (
+                                <div key={`n2-${i}`} class="digit-box border-none">{d}</div>
+                            ))}
+
+                            {/* 各段の入力枠 */}
+                            {[0, 1, 2].map(rIdx => (
+                                <React.Fragment key={`row-${rIdx}`}>
+                                    {inputRows[rIdx].map((d, i) => (
+                                        <div key={`${rIdx}-${i}`} 
+                                            style={{ gridColumnStart: i === 0 ? [p1Start, p2Start, p3Start][rIdx] : 'auto' }}
+                                            class={`digit-box ${rIdx === 0 ? 'thick-border-top' : ''} ${currentRowIdx === rIdx && getOrder(inputRows[rIdx].length, rIdx)[step] === i ? 'active-slot' : ''}`}>
+                                            {d}
+                                        </div>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+
+                            {/* 合計 */}
+                            {inputRows[3].map((d, i) => (
+                                <div key={`ans-${i}`} style={{ gridColumnStart: i === 0 ? ansStart : 'auto' }}
+                                    class={`digit-box thick-border-top ${currentRowIdx === 3 && getOrder(inputRows[3].length, 3)[step] === i ? 'active-slot' : ''}`}>
+                                    {d}
+                                </div>
+                            ))}
+                        </div>
+                        <div class="mt-10 h-16 text-4xl font-bold text-green-600">{feedback}</div>
+                    </div>
+
+                    {/* テンキー */}
+                    <div class="w-2/5 bg-slate-100 p-8 flex flex-col justify-center">
+                        <div class="grid grid-cols-3 gap-4 mb-8 text-center">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(n => (
+                                <button key={n} onClick={() => handleKeyInput(n.toString())} 
+                                    class="key-btn bg-white rounded-2xl shadow-md active:bg-slate-200 transition-all active:scale-95">{n}</button>
+                            ))}
+                            <button onClick={handleDelete} class="key-btn col-span-2 bg-rose-50 text-rose-600 rounded-2xl shadow-md">DEL</button>
+                        </div>
+                        {!feedback ? (
+                            <button onClick={confirmRow} class="w-full py-8 bg-indigo-600 text-white rounded-3xl text-3xl font-bold shadow-xl active:scale-90 transition-transform">
+                                GO
+                            </button>
+                        ) : (
+                            <button onClick={() => {
+                                const next = (currentIndex + 1) % problems.length;
+                                setCurrentIndex(next);
+                                initProblem(problems[next]);
+                            }} class="w-full py-8 bg-emerald-600 text-white rounded-3xl text-3xl font-bold shadow-xl">
+                                next
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
