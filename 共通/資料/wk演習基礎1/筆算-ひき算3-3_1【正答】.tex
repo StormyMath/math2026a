@@ -1,0 +1,85 @@
+\documentclass[a4paper, 11pt]{ltjsarticle}
+\usepackage[margin=15mm]{geometry}
+\usepackage{amsmath}
+\usepackage{multicol}
+
+\usepackage{bm}
+\usepackage{array}
+\usepackage{calc}
+\usepackage[table]{xcolor} 
+\usepackage{makecell}      
+
+\setlength{\parindent}{0pt}
+\setlength{\columnsep}{25mm}
+\newlength{\probheight}
+
+% --- 枠付き筆算用マクロ(ひき算用:動的列生成) ---
+\newcommand{\hissangrid}[4]{
+    \begin{minipage}[t][\probheight][t]{\linewidth}
+        \vspace{4ex}
+        {\Large #1)} 
+        \vspace{1ex} \\
+        \centering
+        \renewcommand{\arraystretch}{2.0}
+        \arrayrulecolor{black!30}
+        \begin{tabular}{|w{c}{2.2em}|w{c}{2.2em}|w{c}{2.2em}|w{c}{2.2em}|}
+            \hline
+            #2 \\ \hline 
+            #3 \\ 
+            \noalign{\global\arrayrulewidth=1.5pt}\arrayrulecolor{black}\hline
+            \noalign{\global\arrayrulewidth=0.4pt}\arrayrulecolor{black!30}
+            #4 \\ \hline
+        \end{tabular}
+        \arrayrulecolor{black}
+    \end{minipage}
+}
+
+\pagestyle{empty}
+
+\begin{document}
+
+% \hskip の代わりに、より安全な \hspace{1zw} を使用します
+% \hspace{1em} {\Large \textbf{筆算トレーニング（3桁－3桁）（正答版）}}
+\hfill
+
+% \rightline{　年\quad 　組\quad 　番 \quad 氏名\underline{\hspace{25ex}}}
+
+% 名前欄と問題の間に 5ex の間隔を空ける
+\vspace*{5ex}
+
+\begin{multicols*}{2}
+\setlength{\probheight}{(\textheight - 60mm) / 3}
+\hissangrid{1}{ & 9 & 7 & 3}{\color{black}- & 8 & 4 & 2}{ & \bm{1} & \bm{3} & \bm{1}} 
+
+\hissangrid{2}{ & 4 & 6 & 1}{\color{black}- & 3 & 8 & 2}{ &  & \bm{7} & \bm{9}} 
+
+\hissangrid{3}{ & 5 & 0 & 0}{\color{black}- & 2 & 8 & 4}{ & \bm{2} & \bm{1} & \bm{6}} 
+
+\columnbreak
+\hissangrid{4}{ & 8 & 4 & 1}{\color{black}- & 3 & 8 & 2}{ & \bm{4} & \bm{5} & \bm{9}} 
+
+\hissangrid{5}{ & 7 & 1 & 0}{\color{black}- & 2 & 2 & 0}{ & \bm{4} & \bm{9} & \bm{0}} 
+
+\hissangrid{6}{ & 7 & 3 & 9}{\color{black}- & 1 & 6 & 2}{ & \bm{5} & \bm{7} & \bm{7}} 
+
+\end{multicols*}
+\newpage
+\setlength{\probheight}{(\textheight - 40mm) / 3}
+\begin{multicols*}{2}
+\hissangrid{7}{ & 6 & 3 & 6}{\color{black}- & 4 & 2 & 4}{ & \bm{2} & \bm{1} & \bm{2}} 
+
+\hissangrid{8}{ & 4 & 6 & 2}{\color{black}- & 3 & 7 & 3}{ &  & \bm{8} & \bm{9}} 
+
+\hissangrid{9}{ & 2 & 9 & 0}{\color{black}- & 2 & 7 & 9}{ &  & \bm{1} & \bm{1}} 
+
+\columnbreak
+\hissangrid{10}{ & 6 & 0 & 2}{\color{black}- & 1 & 7 & 5}{ & \bm{4} & \bm{2} & \bm{7}} 
+
+\hissangrid{11}{ & 8 & 7 & 6}{\color{black}- & 8 & 7 & 0}{ &  &  & \bm{6}} 
+
+\hissangrid{12}{ & 6 & 3 & 9}{\color{black}- & 4 & 1 & 9}{ & \bm{2} & \bm{2} & \bm{0}} 
+
+
+\end{multicols*}
+
+\end{document}

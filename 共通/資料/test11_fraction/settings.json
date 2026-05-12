@@ -1,0 +1,11 @@
+{
+    "print_title": "次の計算をしなさい。",
+    "columns": 2,
+    "rows_per_page": 8,
+    "show_name_field": true,
+    "name_field_format": "\\rightline{　年\\quad 　組\\quad 　番 \\quad 氏名\\underline{\\hspace{25ex}}}",
+    "template_file": "../_templates/base_layout.tex",
+    "input_csv": "master_fraction.csv",
+    "output_tex": "calctest-11_prob.tex",
+    "output_ans_tex": "calctest-11_ans.tex"
+}

@@ -1,0 +1,95 @@
+\documentclass[a4paper, 11pt]{ltjsarticle}
+\usepackage[margin=15mm]{geometry}
+\usepackage{amsmath}
+\usepackage{multicol}
+
+\usepackage{bm}
+\usepackage{array}
+\usepackage{calc}
+\usepackage[table]{xcolor} 
+\usepackage{makecell}      
+
+\setlength{\parindent}{0pt}
+\setlength{\columnsep}{25mm}
+\newlength{\probheight}
+
+% --- 枠付き筆算用マクロ(2x2用) ---
+\newcommand{\hissangrid}[7]{
+    \begin{minipage}[t][\probheight][t]{\linewidth}
+        \vspace*{2ex}
+        {\Large #1)} \par
+        \vspace*{1em}
+        \begin{center}
+        \renewcommand{\arraystretch}{2.0}
+        \arrayrulecolor{black!30}
+        \begin{tabular}{|w{c}{2.2em}|w{c}{2.2em}|w{c}{2.2em}|w{c}{2.2em}|w{c}{2.2em}|}
+            \hline
+            & & & #2 \\ \hline 
+            & \color{black}#7 & & #3 \\ 
+            \noalign{\global\arrayrulewidth=1.5pt}\arrayrulecolor{black}\hline
+            \noalign{\global\arrayrulewidth=0.4pt}\arrayrulecolor{black!30}
+            & & #4 \\ \hline
+            & #5 & \\ 
+            \noalign{\global\arrayrulewidth=1.5pt}\arrayrulecolor{black}\hline
+            \noalign{\global\arrayrulewidth=0.4pt}\arrayrulecolor{black!30}
+            & #6 \\ \hline
+        \end{tabular}
+        \arrayrulecolor{black}
+        \end{center}
+    \end{minipage}
+}
+
+\pagestyle{empty}
+
+\begin{document}
+
+% \hskip の代わりに、より安全な \hspace{1zw} を使用します
+% \hspace{1em} {\Large \textbf{筆算トレーニング（2桁×2桁）}}
+\hfill
+
+% \rightline{　年\quad 　組\quad 　番 \quad 氏名\underline{\hspace{25ex}}}
+次の計算をしなさい。
+% 名前欄と問題の間に 5ex の間隔を空ける
+\vspace*{5ex}
+
+\begin{multicols*}{2}
+\setlength{\probheight}{(\textheight - 60mm) / 2}
+\hissangrid{1}{4 & 5}{1 & 7}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{2}{9 & 5}{1 & 3}{ & & }{ & & }{ & & & }{×} 
+
+\columnbreak
+\hissangrid{3}{1 & 4}{2 & 7}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{4}{3 & 7}{9 & 1}{ & & }{ & & }{ & & & }{×} 
+
+\end{multicols*}
+\newpage
+\setlength{\probheight}{(\textheight - 20mm) / 2}
+\begin{multicols*}{2}
+\hissangrid{5}{7 & 7}{7 & 4}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{6}{2 & 5}{4 & 9}{ & & }{ & & }{ & & & }{×} 
+
+\columnbreak
+\hissangrid{7}{6 & 6}{6 & 7}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{8}{3 & 5}{5 & 5}{ & & }{ & & }{ & & & }{×} 
+
+\end{multicols*}
+\newpage
+\setlength{\probheight}{(\textheight - 20mm) / 2}
+\begin{multicols*}{2}
+\hissangrid{9}{5 & 7}{7 & 2}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{10}{1 & 7}{3 & 4}{ & & }{ & & }{ & & & }{×} 
+
+\columnbreak
+\hissangrid{11}{8 & 5}{4 & 8}{ & & }{ & & }{ & & & }{×} 
+
+\hissangrid{12}{2 & 4}{3 & 1}{ & & }{ & & }{ & & & }{×} 
+
+
+\end{multicols*}
+
+\end{document}
