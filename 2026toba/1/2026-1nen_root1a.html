@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <!-- タブレット・スマホ（iPad等）での表示倍率固定・操作性向上のためのビューポート設定 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>平方根トレーニング（√A = B√C）</title>
+    
+    <!-- React, ReactDOM, Babel, Tailwind CSSのCDN読み込み -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* 画面全体の高さを画面いっぱいに固定 */
+        .full-height { height: 100vh; }
+        
+        /* テンキーのボタンスタイル */
+        .key-btn { 
+            font-size: 2.2rem; 
+            font-weight: bold; 
+            height: 85px; 
+            transition: all 0.1s; 
+            border-bottom: 4px solid #cbd5e1; 
+        }
+        .key-btn:active { 
+            transform: translateY(4px); 
+            background-color: #f1f5f9; 
+            border-bottom-width: 0; 
+        }
+
+        /* 入力ボックスのスタイル（BとC用） */
+        .input-box { 
+            min-width: 95px; 
+            height: 105px; 
+            padding: 0 10px;
+            border-radius: 14px; 
+            border-bottom: 6px solid #e2e8f0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 3.8rem; 
+            font-weight: bold; 
+            font-family: monospace;
+            transition: all 0.2s; 
+            cursor: pointer;
+        }
+        .focus-box { 
+            border-color: #6366f1; 
+            background-color: #eef2ff; 
+            color: #4338ca; 
+        }
+        
+        button { touch-action: manipulation; }
+    </style>
+</head>
+<body class="bg-slate-50 overflow-hidden">
+    <div id="root"></div>
+
+    <!-- ========================================== -->
+    <!-- Firebase 初期化設定（Firestoreへのログ記録） -->
+    <!-- ========================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAOJnHuUqjc8caecnNu_pkul2ORvzWmox0",
+            authDomain: "start01-20260120a-76f80.firebaseapp.com",
+            projectId: "start01-20260120a-76f80",
+            storageBucket: "start01-20260120a-76f80.firebasestorage.app",
+            messagingSenderId: "213284691100",
+            appId: "1:213284691100:web:046aa5f86e4cb1a2562159"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        window.firebaseDB = { 
+            db, 
+            collection, 
+            addDoc, 
+            serverTimestamp, 
+            collectionName: "test_logs_2026_1nen" 
+        };
+    </script>
+
+    <!-- ========================================== -->
+    <!-- React アプリケーション本体 -->
+    <!-- ========================================== -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const UI_TEXT = {
+            LOGIN_TITLE: "なまえを えらんでね（1ねん）",
+            LABEL_STUDENT: "さん",
+            BTN_DELETE: "けす",
+            BTN_DECIDE: "けってい",
+            BTN_NEXT: "つぎへ",
+            MSG_CORRECT: "⭕ せいかい！",
+            MSG_WRONG: "❌ ざんねん！",
+            COUNT_LABEL: "れんぞくせいかい",
+            PROGRESS_LABEL: "しんちょく",
+            LOADING: "よみこみちゅう..."
+        };
+
+        const APP_ID = "test_2026-1nen_sqrt"; 
+
+        const classRoster = [
+            { id: "1", name: "生徒1101" }, 
+            { id: "2", name: "生徒1105" }, 
+            { id: "3", name: "生徒1106" },
+            { id: "4", name: "生徒1108" }, 
+            { id: "5", name: "生徒1109" }, 
+            { id: "6", name: "生徒1113" },
+            { id: "7", name: "生徒1114" }, 
+            { id: "8", name: "生徒1201" },
+            { id: "9", name: "生徒1202" }, 
+            { id: "10", name: "生徒1210" }, 
+            { id: "11", name: "生徒1211" },
+        ];
+
+        function App() {
+            const [currentStudent, setCurrentStudent] = useState(null);
+            const [problems, setProblems] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+
+            // B と C の入力を分離
+            const [inputB, setInputB] = useState("");
+            const [inputC, setInputC] = useState("");
+            const [currentFocus, setCurrentFocus] = useState("B"); // "B" または "C"
+
+            const [feedback, setFeedback] = useState(null);
+            const [missCount, setMissCount] = useState(0);
+            const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
+            const [startTime, setStartTime] = useState(null);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            // √A = B√C 型問題の自動生成
+            useEffect(() => {
+                const data = [];
+                let idCounter = 1;
+
+                for (let a = 8; a <= 50; a++) {
+                    let bestB = 1;
+                    let bestC = a;
+
+                    for (let b = Math.floor(Math.sqrt(a)); b >= 2; b--) {
+                        if (a % (b * b) === 0) {
+                            bestB = b;
+                            bestC = a / (b * b);
+                            break;
+                        }
+                    }
+
+                    if (bestB >= 2 && bestC >= 2) {
+                        data.push({
+                            id: idCounter.toString(),
+                            a: a.toString(),
+                            ansB: bestB.toString(),
+                            ansC: bestC.toString()
+                        });
+                        idCounter++;
+                    }
+                }
+
+                // シャッフル
+                for (let i = data.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [data[i], data[j]] = [data[j], data[i]];
+                }
+                setProblems(data);
+            }, []);
+
+            const startDrill = (student) => { 
+                setCurrentStudent(student); 
+                setStartTime(Date.now()); 
+            };
+
+            // テンキー入力処理
+            const handleKeyInput = (val) => { 
+                if (feedback || isSubmitting) return; 
+
+                if (currentFocus === "B") {
+                    setInputB(val);
+                    setCurrentFocus("C"); // Bが入力されたら自動でCへ移動
+                } else {
+                    // Cは2桁の場合（10, 11など）があるため追記形式
+                    if (inputC.length < 2) {
+                        setInputC(prev => prev + val);
+                    }
+                }
+            };
+
+            // 1文字削除
+            const handleDelete = () => { 
+                if (feedback || isSubmitting) return; 
+
+                if (currentFocus === "C") {
+                    if (inputC !== "") {
+                        setInputC(prev => prev.slice(0, -1));
+                    } else {
+                        setCurrentFocus("B");
+                    }
+                } else {
+                    setInputB("");
+                }
+            };
+            
+            // 答え合わせ判定
+            const checkAnswer = async () => {
+                if (!inputB || !inputC || isSubmitting) return;
+                const current = problems[currentIndex];
+                
+                if (inputB === current.ansB && inputC === current.ansC) {
+                    setIsSubmitting(true);
+                    setFeedback(UI_TEXT.MSG_CORRECT);
+                    setConsecutiveCorrect(prev => prev + 1);
+
+                    try {
+                        const { db, collection, addDoc, serverTimestamp, collectionName } = window.firebaseDB;
+                        await addDoc(collection(db, collectionName), {
+                            app_id: APP_ID,
+                            student_id: currentStudent.id,
+                            student_name: currentStudent.name,
+                            problem: `√${current.a}=${current.ansB}√${current.ansC}`,
+                            miss_count: missCount,
+                            duration: (Date.now() - startTime) / 1000,
+                            timestamp: serverTimestamp(),
+                            progress: `${currentIndex + 1}/${problems.length}`
+                        });
+                    } catch (e) { 
+                        console.error("ログ送信エラー:", e); 
+                    }
+                } else {
+                    setMissCount(prev => prev + 1);
+                    setConsecutiveCorrect(0);
+                    setFeedback(UI_TEXT.MSG_WRONG);
+                    setTimeout(() => { 
+                        setFeedback(null); 
+                        setInputB("");
+                        setInputC("");
+                        setCurrentFocus("B");
+                    }, 800);
+                }
+            };
+
+            const nextProblem = () => {
+                setCurrentIndex(prev => (prev + 1) % problems.length);
+                setInputB("");
+                setInputC("");
+                setCurrentFocus("B");
+                setFeedback(null);
+                setMissCount(0);
+                setStartTime(Date.now());
+                setIsSubmitting(false);
+            };
+
+            if (!currentStudent) {
+                return (
+                    <div className="p-10 text-center">
+                        <h1 className="text-4xl font-bold mb-10 text-slate-700">{UI_TEXT.LOGIN_TITLE}</h1>
+                        <div className="grid grid-cols-4 gap-4">
+                            {classRoster.map(s => (
+                                <button 
+                                    key={s.id} 
+                                    onClick={() => startDrill(s)} 
+                                    className="p-6 bg-white border-2 border-slate-200 rounded-2xl text-xl font-bold shadow-md hover:bg-slate-50 transition"
+                                >
+                                    {s.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (problems.length === 0) {
+                return <div className="p-10 text-center text-2xl">{UI_TEXT.LOADING}</div>;
+            }
+
+            const current = problems[currentIndex];
+
+            return (
+                <div className="flex full-height">
+                    {/* 左半分：問題表示・ボックス領域 */}
+                    <div className="w-1/2 flex flex-col items-center justify-center border-r-2 border-slate-200 bg-white p-10 relative">
+                        <div className="absolute top-6 left-6 text-left space-y-4">
+                            <div>
+                                <div className="text-indigo-600 text-sm font-black uppercase tracking-wider">{UI_TEXT.COUNT_LABEL}</div>
+                                <div className="text-3xl font-black text-indigo-700">{consecutiveCorrect} <span className="text-lg">回</span></div>
+                            </div>
+                            <div>
+                                <div className="text-indigo-400 text-sm font-black uppercase tracking-wider">{UI_TEXT.PROGRESS_LABEL}</div>
+                                <div className="text-3xl font-black text-indigo-400">
+                                    {currentIndex + 1} <span className="text-lg">もんめ</span> <span className="text-xl mx-1">/</span> {problems.length} <span className="text-lg">もん</span>
+                                </div>
+                            </div>
+                            <div className="text-slate-300 text-xs font-bold pt-2">
+                                生徒{currentStudent.name} {UI_TEXT.LABEL_STUDENT}
+                            </div>
+                        </div>
+
+                        {/* 計算式（√A = [ B ] √ [ C ]）の構造表示 */}
+                        <div className="flex items-center gap-4 text-7xl font-bold text-slate-800 mb-10">
+                            <span>√{current.a}</span>
+                            <span>=</span>
+                            
+                            {/* Bの入力枠（タップでフォーカス切替可能） */}
+                            <div 
+                                onClick={() => setCurrentFocus("B")}
+                                className={`input-box ${currentFocus === "B" ? "focus-box" : "bg-slate-50 text-slate-700"}`}
+                            >
+                                {inputB}
+                            </div>
+                            
+                            <span>√</span>
+                            
+                            {/* Cの入力枠（タップでフォーカス切替可能） */}
+                            <div 
+                                onClick={() => setCurrentFocus("C")}
+                                className={`input-box ${currentFocus === "C" ? "focus-box" : "bg-slate-50 text-slate-700"}`}
+                            >
+                                {inputC}
+                            </div>
+                        </div>
+
+                        <div className="mt-8 h-12 flex items-center justify-center text-4xl font-bold text-center">
+                            {feedback && (
+                                <span className={feedback.includes('⭕') ? 'text-orange-500' : 'text-blue-500'}>
+                                    {feedback}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 右半分：テンキー操作領域 */}
+                    <div className="w-1/2 bg-slate-100 p-8 flex flex-col justify-center">
+                        <div className="grid grid-cols-3 gap-3 mb-6">
+                            {[7, 8, 9, 4, 5, 6, 1, 2, 3, 0].map(n => (
+                                <button 
+                                    key={n} 
+                                    onClick={() => handleKeyInput(n.toString())} 
+                                    className="key-btn bg-white rounded-xl shadow-md"
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                            <button 
+                                onClick={handleDelete} 
+                                className="key-btn col-span-2 bg-red-50 text-red-600 rounded-xl shadow-md border-red-200"
+                            >
+                                {UI_TEXT.BTN_DELETE}
+                            </button>
+                        </div>
+
+                        {!feedback ? (
+                            <button 
+                                onClick={checkAnswer} 
+                                className="w-full py-8 bg-indigo-600 text-white rounded-2xl text-4xl font-bold shadow-lg border-b-8 border-indigo-800 active:border-b-0"
+                            >
+                                {UI_TEXT.BTN_DECIDE}
+                            </button>
+                        ) : (
+                            feedback.includes('⭕') && (
+                                <button 
+                                    onClick={nextProblem} 
+                                    className="w-full py-8 bg-green-500 text-white rounded-2xl text-4xl font-bold shadow-lg border-b-8 border-green-700 animate-pulse active:border-b-0"
+                                >
+                                    {UI_TEXT.BTN_NEXT}
+                                </button>
+                            )
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
