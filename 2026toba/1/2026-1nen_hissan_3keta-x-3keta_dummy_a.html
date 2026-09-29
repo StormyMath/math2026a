@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3x3筆算：入力順序最適化版</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .full-height { height: 100vh; }
+        .hissan-font { font-family: 'Courier New', Courier, monospace; font-weight: bold; }
+        .digit-box { 
+            width: 4rem; height: 5.2rem; 
+            border: 1px solid #d1d5db;
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 3.2rem; background: white;
+        }
+        .thick-border-top { border-top: 5px solid black !important; }
+        .active-slot { background-color: #fef08a; outline: 4px solid #eab308; z-index: 10; }
+        .key-btn { font-size: 2.2rem; font-weight: bold; height: 85px; transition: all 0.1s; border-bottom: 4px solid #cbd5e1; }
+        .key-btn:active { transform: translateY(4px); background-color: #f1f5f9; border-bottom-width: 0; }
+        button { touch-action: manipulation; }
+    </style>
+</head>
+<body class="bg-slate-50 overflow-hidden">
+    <div id="root"></div>
+
+    <!-- Firebase 初期化設定 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyAOJnHuUqjc8caecnNu_pkul2ORvzWmox0",
+            authDomain: "start01-20260120a-76f80.firebaseapp.com",
+            projectId: "start01-20260120a-76f80",
+            storageBucket: "start01-20260120a-76f80.firebasestorage.app",
+            messagingSenderId: "213284691100",
+            appId: "1:213284691100:web:046aa5f86e4cb1a2562159"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.firebaseDB = { db, collection, addDoc, serverTimestamp, collectionName: "test_logs_2026_1nen" };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const UI_TEXT = {
+            LOGIN_TITLE: "なまえを えらんでね（1ねん）",
+            LABEL_STUDENT: "さん",
+            BTN_DELETE: "けす",
+            BTN_DECIDE: "はんてい",
+            BTN_NEXT: "つぎへ",
+            MSG_CORRECT: "⭕ せいかい！",
+            MSG_WRONG: "❌ ざんねん！",
+            COUNT_LABEL: "れんぞくせいかい",
+            PROGRESS_LABEL: "しんちょく",
+            LOADING: "よみこみちゅう..."
+        };
+
+        const APP_ID = "test_2026_hissan_3x3";
+
+        const classRoster = [
+            { id: "1", name: "生徒1101" }, 
+            { id: "2", name: "生徒1105" }, 
+            { id: "3", name: "生徒1106" },
+            { id: "4", name: "生徒1108" }, 
+            { id: "5", name: "生徒1109" }, 
+            { id: "6", name: "生徒1113" },
+            { id: "7", name: "生徒1114" }, 
+            { id: "8", name: "生徒1201" },
+            { id: "9", name: "生徒1202" }, 
+            { id: "10", name: "生徒1210" }, 
+            { id: "11", name: "生徒1211" },
+            { id: "12", name: "dummy" },
+        ];
+
+        function App() {
+            const [currentStudent, setCurrentStudent] = useState(null);
+            const [problems, setProblems] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [currentRowIdx, setCurrentRowIdx] = useState(0); 
+            const [step, setStep] = useState(0); 
+            const [inputRows, setInputRows] = useState([]);
+            const [feedback, setFeedback] = useState(null);
+            const [missCount, setMissCount] = useState(0);
+            const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
+            const [startTime, setStartTime] = useState(null);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            useEffect(() => {
+                fetch('problems_kakezan_3x3.csv')
+                    .then(res => res.text())
+                    .then(text => {
+                        const data = text.split('\n').slice(1).filter(l => l.trim()).map(l => {
+                            const v = l.split(',');
+                            return { id: v[0], n1: v[1], n2: v[2], p1: v[3].trim(), p2: v[4].trim(), p3: v[5].trim(), ans: v[6].trim() };
+                        });
+                        setProblems(data);
+                        if (data[0]) initProblem(data[0]);
+                    });
+            }, []);
+
+            const initProblem = (prob) => {
+                setInputRows([
+                    Array(prob.p1.length).fill(""),
+                    Array(prob.p2.length).fill(""),
+                    Array(prob.p3.length).fill(""),
+                    Array(prob.ans.length).fill("")
+                ]);
+                setCurrentRowIdx(0);
+                setStep(0);
+                setFeedback(null);
+                setMissCount(0);
+                setStartTime(Date.now());
+                setIsSubmitting(false);
+            };
+
+            const startDrill = (student) => {
+                setCurrentStudent(student);
+                setStartTime(Date.now());
+            };
+
+            // 入力順序ロジック
+            const getOrder = (len, rowIdx) => {
+                if (!problems[currentIndex]) return [];
+                const current = problems[currentIndex];
+
+                if (rowIdx < 3) {
+                    if (len === 4) return [3, 2, 0, 1];
+                    if (len === 3) return [2, 1, 0];
+                } 
+                if (rowIdx === 3) {
+                    const p3Len = current.p3.length;
+                    if (p3Len === 3 && len === 6) {
+                        return [5, 4, 3, 2, 0, 1];
+                    }
+                    if (len === 6) return [5, 4, 3, 2, 1, 0];
+                    if (len === 5) return [4, 3, 2, 1, 0]; 
+                }
+                let defaultOrder = [];
+                for (let i = len - 1; i >= 0; i--) defaultOrder.push(i);
+                return defaultOrder;
+            };
+
+            const handleKeyInput = (num) => {
+                if (feedback || isSubmitting || !inputRows[currentRowIdx]) return;
+                const order = getOrder(inputRows[currentRowIdx].length, currentRowIdx);
+                if (step < order.length) {
+                    const newRows = [...inputRows];
+                    newRows[currentRowIdx][order[step]] = num;
+                    setInputRows(newRows);
+                    setStep(step + 1);
+                }
+            };
+
+            const handleDelete = () => {
+                if (feedback || isSubmitting || step === 0) return;
+                const newRows = [...inputRows];
+                const order = getOrder(inputRows[currentRowIdx].length, currentRowIdx);
+                newRows[currentRowIdx][order[step - 1]] = "";
+                setInputRows(newRows);
+                setStep(step - 1);
+            };
+
+            const confirmRow = async () => {
+                if (isSubmitting) return;
+                const currentProblem = problems[currentIndex];
+                const rowData = inputRows[currentRowIdx].join("");
+                let correctVal = [currentProblem.p1, currentProblem.p2, currentProblem.p3, currentProblem.ans][currentRowIdx];
+
+                if (rowData === correctVal) {
+                    if (currentRowIdx < 3) {
+                        // 次の段へ
+                        setCurrentRowIdx(currentRowIdx + 1);
+                        setStep(0);
+                    } else {
+                        // 全段正解（完了）
+                        setIsSubmitting(true);
+                        setFeedback(UI_TEXT.MSG_CORRECT);
+                        setConsecutiveCorrect(prev => prev + 1);
+
+                        // Firestoreへ送信
+                        try {
+                            const { db, collection, addDoc, serverTimestamp, collectionName } = window.firebaseDB;
+                            await addDoc(collection(db, collectionName), {
+                                app_id: APP_ID,
+                                student_id: currentStudent.id,
+                                student_name: currentStudent.name,
+                                problem: `${currentProblem.n1}×${currentProblem.n2}`,
+                                miss_count: missCount,
+                                duration: (Date.now() - startTime) / 1000,
+                                timestamp: serverTimestamp(),
+                                progress: `${currentIndex + 1}/${problems.length}`
+                            });
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                } else {
+                    // 不正解時の処理
+                    setMissCount(prev => prev + 1);
+                    setConsecutiveCorrect(0);
+                    setFeedback(UI_TEXT.MSG_WRONG);
+                    setTimeout(() => {
+                        setFeedback(null);
+                        const newRows = [...inputRows];
+                        newRows[currentRowIdx] = Array(newRows[currentRowIdx].length).fill("");
+                        setInputRows(newRows);
+                        setStep(0);
+                    }, 800);
+                }
+            };
+
+            // 生徒選択画面
+            if (!currentStudent) {
+                return (
+                    <div className="p-10 text-center">
+                        <h1 className="text-4xl font-bold mb-10 text-slate-700">{UI_TEXT.LOGIN_TITLE}</h1>
+                        <div className="grid grid-cols-4 gap-4">
+                            {classRoster.map(s => (
+                                <button key={s.id} onClick={() => startDrill(s)} className="p-6 bg-white border-2 border-slate-200 rounded-2xl text-xl font-bold shadow-md hover:bg-slate-50 transition">{s.name}</button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (problems.length === 0 || inputRows.length === 0) {
+                return <div className="p-10 text-center text-2xl">{UI_TEXT.LOADING}</div>;
+            }
+
+            const current = problems[currentIndex];
+            const isSuccess = feedback === UI_TEXT.MSG_CORRECT;
+
+            // 座標計算
+            const n1Start = 4;
+            const n2Start = 3;
+            const p1Start = 7 - current.p1.length;
+            const p2Start = 6 - current.p2.length;
+            const p3Start = 5 - current.p3.length;
+            const ansStart = 7 - current.ans.length;
+
+            return (
+                <div className="flex full-height">
+                    {/* 左半分：問題および筆算表示領域 */}
+                    <div className="w-3/5 bg-white border-r-2 border-slate-200 p-6 flex flex-col items-center justify-center relative">
+                        {/* 進捗・連続正解・生徒名表示 */}
+                        <div className="absolute top-6 left-6 text-left space-y-4">
+                            <div>
+                                <div className="text-indigo-600 text-sm font-black uppercase tracking-wider">{UI_TEXT.COUNT_LABEL}</div>
+                                <div className="text-3xl font-black text-indigo-700">{consecutiveCorrect} <span className="text-lg">回</span></div>
+                            </div>
+                            <div>
+                                <div className="text-indigo-400 text-sm font-black uppercase tracking-wider">{UI_TEXT.PROGRESS_LABEL}</div>
+                                <div className="text-3xl font-black text-indigo-400">
+                                    {currentIndex + 1} <span className="text-lg">もんめ</span> <span className="text-xl mx-1">/</span> {problems.length} <span className="text-lg">もん</span>
+                                </div>
+                            </div>
+                            <div className="text-slate-300 text-xs font-bold pt-2">
+                                生徒{currentStudent.name} {UI_TEXT.LABEL_STUDENT}
+                            </div>
+                        </div>
+
+                        <div className="mb-4 text-slate-400 font-bold text-xl italic">No. {current.id}</div>
+                        
+                        {/* 筆算グリッド */}
+                        <div className="grid grid-cols-6 hissan-font">
+                            {/* 問題部 */}
+                            {current.n1.split('').map((d, i) => (
+                                <div key={`n1-${i}`} className="digit-box border-none" style={{ gridColumnStart: i === 0 ? n1Start : 'auto' }}>{d}</div>
+                            ))}
+                            <div className="digit-box border-none text-black" style={{ gridColumnStart: n2Start }}>×</div>
+                            {current.n2.split('').map((d, i) => (
+                                <div key={`n2-${i}`} className="digit-box border-none">{d}</div>
+                            ))}
+
+                            {/* 各段の入力枠 */}
+                            {[0, 1, 2].map(rIdx => (
+                                <React.Fragment key={`row-${rIdx}`}>
+                                    {inputRows[rIdx].map((d, i) => (
+                                        <div key={`${rIdx}-${i}`} 
+                                            style={{ gridColumnStart: i === 0 ? [p1Start, p2Start, p3Start][rIdx] : 'auto' }}
+                                            className={`digit-box ${rIdx === 0 ? 'thick-border-top' : ''} ${currentRowIdx === rIdx && getOrder(inputRows[rIdx].length, rIdx)[step] === i && !feedback ? 'active-slot' : ''}`}>
+                                            {d}
+                                        </div>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+
+                            {/* 合計 */}
+                            {inputRows[3].map((d, i) => (
+                                <div key={`ans-${i}`} style={{ gridColumnStart: i === 0 ? ansStart : 'auto' }}
+                                    className={`digit-box thick-border-top ${currentRowIdx === 3 && getOrder(inputRows[3].length, 3)[step] === i && !feedback ? 'active-slot' : ''}`}>
+                                    {d}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* メッセージフィードバック */}
+                        <div className="mt-8 h-12 flex items-center justify-center text-4xl font-bold text-center">
+                            {feedback && (
+                                <span className={feedback.includes('⭕') ? 'text-orange-500' : 'text-blue-500'}>
+                                    {feedback}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 右半分：テンキー操作領域 */}
+                    <div className="w-2/5 bg-slate-100 p-8 flex flex-col justify-center">
+                        <div className="grid grid-cols-3 gap-3 mb-6 text-center">
+                            {[7, 8, 9, 4, 5, 6, 1, 2, 3, 0].map(n => (
+                                <button key={n} onClick={() => handleKeyInput(n.toString())} 
+                                    className="key-btn bg-white rounded-xl shadow-md">{n}</button>
+                            ))}
+                            <button onClick={handleDelete} className="key-btn col-span-2 bg-red-50 text-red-600 rounded-xl shadow-md border-red-200">
+                                {UI_TEXT.BTN_DELETE}
+                            </button>
+                        </div>
+                        {!isSuccess ? (
+                            <button 
+                                onClick={confirmRow} 
+                                disabled={!!feedback}
+                                className={`w-full py-8 text-white rounded-2xl text-4xl font-bold shadow-lg border-b-8 active:border-b-0 ${feedback ? 'bg-gray-400 border-gray-600' : 'bg-indigo-600 border-indigo-800'}`}
+                            >
+                                {UI_TEXT.BTN_DECIDE}
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={() => {
+                                    const next = (currentIndex + 1) % problems.length;
+                                    setCurrentIndex(next);
+                                    initProblem(problems[next]);
+                                }} 
+                                className="w-full py-8 bg-green-500 text-white rounded-2xl text-4xl font-bold shadow-lg border-b-8 border-green-700 animate-pulse active:border-b-0"
+                            >
+                                {UI_TEXT.BTN_NEXT}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
